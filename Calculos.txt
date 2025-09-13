@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Calculadora Cashea — Mini App</title>
+  <style>
+    :root{
+      --bg:#f6f9fc; --card:#ffffff; --accent:#1f6feb; --ok:#1aa260; --warn:#f59e0b;
+      --danger:#ef4444; --muted:#6b7280; --glass: rgba(31,111,235,0.08);
+      font-family: Inter, Roboto, "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial;
+    }
+    body{background:var(--bg); margin:0; padding:28px; color:#111827;}
+    .container{max-width:920px; margin:0 auto;}
+    h1{margin:0 0 6px; font-size:20px;}
+    p.lead{margin:0 0 18px; color:var(--muted); font-size:14px;}
+    .card{background:var(--card); border-radius:12px; padding:18px; box-shadow:0 6px 18px rgba(15,23,42,0.06); margin-bottom:14px;}
+    .grid{display:grid; gap:12px; grid-template-columns: repeat(auto-fit,minmax(220px,1fr));}
+    label{display:block; font-size:13px; margin-bottom:6px; color:#374151;}
+    input[type="number"], select {width:100%; padding:10px 12px; border-radius:8px; border:1px solid #e5e7eb; background:#fff; font-size:14px;}
+    .btn {display:inline-block; padding:9px 14px; border-radius:8px; border:0; cursor:pointer; font-weight:600;}
+    .btn-primary{background:var(--accent); color:#fff;}
+    .btn-ghost{background:transparent; border:1px solid #e5e7eb; color:#111827;}
+    .results {display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px;}
+    .result-item{background:var(--glass); padding:10px; border-radius:8px;}
+    .small{font-size:12px; color:var(--muted);}
+    table{width:100%; border-collapse:collapse; margin-top:12px;}
+    th, td{padding:8px 10px; text-align:left; border-bottom:1px solid #eef2f7;}
+    .positive{color:var(--ok); font-weight:700;}
+    .negative{color:var(--danger); font-weight:700;}
+    .helper{font-size:13px; color:var(--muted); margin-top:8px;}
+    footer{font-size:12px; color:var(--muted); margin-top:8px;}
+    @media (max-width:520px){ .results{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Calculadora Cashea (mini app)</h1>
+      <p class="lead">Introduce precio, nivel, crédito disponible y cuotas. La app calcula inicial teórica, financiación y cuotas reales.</p>
+
+      <div class="grid">
+        <div>
+          <label for="precio">Precio del producto (USD)</label>
+          <input id="precio" type="number" min="0" step="0.01" value="900" />
+        </div>
+
+        <div>
+          <label for="nivel">Nivel (1 → 6)</label>
+          <select id="nivel">
+            <option value="1">Nivel 1 — 60%</option>
+            <option value="2" selected>Nivel 2 — 50%</option>
+            <option value="3">Nivel 3 — 40%</option>
+            <option value="4">Nivel 4 — 30%</option>
+            <option value="5">Nivel 5 — 20%</option>
+            <option value="6">Nivel 6 — 20%</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="porcentaje">%(Inicial teórico) — editable</label>
+          <input id="porcentaje" type="number" min="0" max="100" step="1" value="50" />
+        </div>
+
+        <div>
+          <label for="credito">Crédito disponible (USD)</label>
+          <input id="credito" type="number" min="0" step="0.01" value="152.33" />
+        </div>
+
+        <div>
+          <label for="cuotas">N° de cuotas (para lo financiado)</label>
+          <input id="cuotas" type="number" min="1" step="1" value="3" />
+        </div>
+
+        <div style="display:flex;align-items:flex-end; gap:8px;">
+          <button id="calcular" class="btn btn-primary">Calcular</button>
+          <button id="reset" class="btn btn-ghost">Limpiar</button>
+          <button id="ejemplo" class="btn btn-ghost">Cargar ejemplo (119$)</button>
+        </div>
+      </div>
+
+      <div class="helper">Regla: la <strong>inicial teórica</strong> = Precio × %Inicial. Si el crédito disponible >= financiación teórica → se mantiene la inicial teórica. Si no, la inicial real = Precio − CréditoDisponible. Lo financiado = mínimo(crédito disponible, financiación teórica).</div>
+    </div>
+
+    <div class="card">
+      <h2>Resultados</h2>
+      <div id="output" class="results" aria-live="polite">
+        <div class="result-item">
+          <div class="small">Inicial teórica</div>
+          <div id="inicial_teorica" style="font-weight:700">—</div>
+        </div>
+        <div class="result-item">
+          <div class="small">Financiación teórica</div>
+          <div id="fin_teorica" style="font-weight:700">—</div>
+        </div>
+        <div class="result-item">
+          <div class="small">Financiación real (usada del crédito)</div>
+          <div id="fin_real" style="font-weight:700">—</div>
+        </div>
+        <div class="result-item">
+          <div class="small">Inicial real</div>
+          <div id="inicial_real" style="font-weight:700">—</div>
+        </div>
+        <div class="result-item">
+          <div class="small">% Inicial real</div>
+          <div id="pct_inicial" style="font-weight:700">—</div>
+        </div>
+        <div class="result-item">
+          <div class="small">Crédito sobrante</div>
+          <div id="credito_sobrante" style="font-weight:700">—</div>
+        </div>
+      </div>
+
+      <table id="tbl" style="display:none">
+        <thead>
+          <tr><th>Concepto</th><th>Valor</th></tr>
+        </thead>
+        <tbody id="tbody">
+        </tbody>
+      </table>
+
+      <div style="margin-top:12px;">
+        <button id="copiar" class="btn btn-ghost">Copiar resumen</button>
+        <button id="guardar" class="btn btn-ghost">Descargar resultado (.txt)</button>
+      </div>
+    </div>
+
+    <footer>Abre este archivo localmente (sin hosting). Si quieres, puedo añadir validaciones, estilos o export directo a CSV/Excel.</footer>
+  </div>
+
+<script>
+  // Niveles → porcentajes
+  const niveles = {1:60, 2:50, 3:40, 4:30, 5:20, 6:20};
+
+  // Formateadores
+  const moneyFmt = new Intl.NumberFormat('en-US', {style:'currency', currency:'USD'});
+  const pctFmt = (v) => (Number.isFinite(v) ? (v*100).toFixed(2) + '%' : '—');
+
+  // DOM
+  const $precio = document.getElementById('precio');
+  const $nivel  = document.getElementById('nivel');
+  const $porcentaje = document.getElementById('porcentaje');
+  const $credito = document.getElementById('credito');
+  const $cuotas  = document.getElementById('cuotas');
+  const $calcular = document.getElementById('calcular');
+  const $reset = document.getElementById('reset');
+  const $ejemplo = document.getElementById('ejemplo');
+
+  const $inicial_teorica = document.getElementById('inicial_teorica');
+  const $fin_teorica = document.getElementById('fin_teorica');
+  const $fin_real = document.getElementById('fin_real');
+  const $inicial_real = document.getElementById('inicial_real');
+  const $pct_inicial = document.getElementById('pct_inicial');
+  const $credito_sobrante = document.getElementById('credito_sobrante');
+
+  const $tbl = document.getElementById('tbl');
+  const $tbody = document.getElementById('tbody');
+  const $copiar = document.getElementById('copiar');
+  const $guardar = document.getElementById('guardar');
+
+  // Auto actualizar % cuando se cambia nivel
+  $nivel.addEventListener('change', ()=> {
+    const n = Number($nivel.value);
+    $porcentaje.value = niveles[n] ?? 0;
+  });
+
+  // Calcular
+  function calcular(){
+    // inputs
+    const P = parseFloat($precio.value) || 0;
+    let p = parseFloat($porcentaje.value) || 0; // en %
+    const C = parseFloat($credito.value) || 0;
+    const n = parseInt($cuotas.value) || 1;
+
+    if (p < 0) p = 0;
+    if (p > 100) p = 100;
+
+    const pFrac = p / 100;
+
+    // inicial teórica y financiación teórica
+    const inicialTeorica = round2(P * pFrac);
+    const financiacionTeorica = round2(P - inicialTeorica);
+
+    // financiacion real = min(C, financiacionTeorica)
+    const financiacionReal = round2(Math.min(C, financiacionTeorica));
+
+    // inicial real = P - financiacionReal
+    const inicialReal = round2(P - financiacionReal);
+
+    // % inicial real
+    const pctInicialReal = P > 0 ? inicialReal / P : 0;
+
+    // monto por cuota (si n>0) -> lo que se financia se divide en n
+    const montoPorCuota = n > 0 ? round2(financiacionReal / n) : 0;
+
+    // credito sobrante
+    const creditoSobrante = round2(C - financiacionReal);
+
+    // render
+    $inicial_teorica.textContent = moneyFmt.format(inicialTeorica);
+    $fin_teorica.textContent = moneyFmt.format(financiacionTeorica);
+    $fin_real.textContent = moneyFmt.format(financiacionReal);
+    $inicial_real.textContent = moneyFmt.format(inicialReal);
+    $pct_inicial.textContent = (pctInicialReal*100).toFixed(2) + '%';
+    $credito_sobrante.textContent = moneyFmt.format(creditoSobrante);
+
+    // Mostrar tabla con detalles y cuotas
+    $tbody.innerHTML = '';
+    addRow('Precio', moneyFmt.format(P));
+    addRow('Nivel seleccionado', $nivel.options[$nivel.selectedIndex].text);
+    addRow('Inicial teórica', moneyFmt.format(inicialTeorica));
+    addRow('Financiación teórica', moneyFmt.format(financiacionTeorica));
+    addRow('Financiación real (usada del crédito)', moneyFmt.format(financiacionReal));
+    addRow('Inicial real', moneyFmt.format(inicialReal));
+    addRow('% inicial real', (pctInicialReal*100).toFixed(2) + '%');
+    addRow('N° cuotas', n);
+    addRow('Monto por cuota', moneyFmt.format(montoPorCuota));
+    addRow('Crédito disponible (antes)', moneyFmt.format(C));
+    addRow('Crédito sobrante (después)', moneyFmt.format(creditoSobrante));
+
+    $tbl.style.display = 'table';
+  }
+
+  // Helpers
+  function round2(x){ return Math.round((x + Number.EPSILON)*100)/100; }
+  function addRow(k,v){
+    const tr = document.createElement('tr');
+    const th = document.createElement('td');
+    th.textContent = k;
+    const td = document.createElement('td');
+    td.textContent = v;
+    tr.appendChild(th); tr.appendChild(td);
+    $tbody.appendChild(tr);
+  }
+
+  // Botones
+  $calcular.addEventListener('click', calcular);
+  $reset.addEventListener('click', ()=>{
+    $precio.value = '';
+    $porcentaje.value = '';
+    $credito.value = '';
+    $cuotas.value = '3';
+    $inicial_teorica.textContent = '—';
+    $fin_teorica.textContent = '—';
+    $fin_real.textContent = '—';
+    $inicial_real.textContent = '—';
+    $pct_inicial.textContent = '—';
+    $credito_sobrante.textContent = '—';
+    $tbody.innerHTML = '';
+    $tbl.style.display = 'none';
+  });
+
+  // ejemplo 119$
+  $ejemplo.addEventListener('click', ()=>{
+    $precio.value = '119';
+    $nivel.value = '2';
+    $porcentaje.value = '50';
+    $credito.value = '152.33';
+    $cuotas.value = '3';
+    calcular();
+  });
+
+  // copiar resumen al portapapeles
+  $copiar.addEventListener('click', ()=>{
+    let text = '';
+    const rows = $tbody.querySelectorAll('tr');
+    rows.forEach(r=>{
+      const k = r.cells[0].textContent.trim();
+      const v = r.cells[1].textContent.trim();
+      text += `${k}: ${v}\n`;
+    });
+    if (!text) text = 'No hay resultados aún. Haz clic en Calcular.';
+    navigator.clipboard.writeText(text).then(()=> {
+      alert('Resumen copiado al portapapeles.');
+    }).catch(()=> { alert('No se pudo copiar. Usa Ctrl+C.'); });
+  });
+
+  // guardar como .txt
+  $guardar.addEventListener('click', ()=>{
+    let text = 'Resultado — Calculadora Cashea\n\n';
+    const rows = $tbody.querySelectorAll('tr');
+    rows.forEach(r=>{
+      const k = r.cells[0].textContent.trim();
+      const v = r.cells[1].textContent.trim();
+      text += `${k}: ${v}\n`;
+    });
+    const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'resultado_cashea.txt';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  // onload example
+  document.addEventListener('DOMContentLoaded', ()=>{
+    // set porcentaje from the default level
+    $porcentaje.value = niveles[$nivel.value];
+    // fill default sample
+    $precio.value = '900';
+    $credito.value = '152.33';
+    $cuotas.value = '3';
+    calcular();
+  });
+
+</script>
+</body>
+</html>
